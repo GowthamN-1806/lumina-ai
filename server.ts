@@ -2608,4 +2608,8 @@ async function setupServer() {
   });
 }
 
-setupServer();
+if (process.env.VERCEL !== "1") {
+  setupServer();
+}
+
+export default app;
