@@ -1,0 +1,499 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
+@import "tailwindcss";
+
+@variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, .dark, .dark *));
+@variant light (&:where([data-theme="light"], [data-theme="light"] *, .light, .light *));
+
+:root {
+  /* Light Theme Design Tokens (Default fallback) */
+  --background: #f8fafc;
+  --surface: rgba(255, 255, 255, 0.85);
+  --surface-secondary: #ffffff;
+  --surface-elevated: #ffffff;
+  --card: #ffffff;
+  --card-glass: rgba(255, 255, 255, 0.8);
+  --border: rgba(15, 23, 42, 0.08);
+  --border-subtle: rgba(15, 23, 42, 0.05);
+  --border-hover: rgba(124, 92, 255, 0.35);
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --accent: #7c5cff;
+  --accent-secondary: #0284c7;
+  --accent-green: #059669;
+  --accent-warning: #d97706;
+  --input: #ffffff;
+  --input-border: rgba(15, 23, 42, 0.12);
+  --shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 12px 32px -4px rgba(15, 23, 42, 0.08);
+  --aurora-opacity: 0.45;
+}
+
+/* Dark Theme Design Tokens (Preserves Lumina's futuristic deep space identity) */
+[data-theme="dark"], .dark, html.dark {
+  --background: #050816;
+  --surface: rgba(255, 255, 255, 0.035);
+  --surface-secondary: #0b0f19;
+  --surface-elevated: #0f172a;
+  --card: #0b0f19;
+  --card-glass: rgba(255, 255, 255, 0.035);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-hover: rgba(124, 92, 255, 0.3);
+  --text-primary: #ffffff;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --accent: #7c5cff;
+  --accent-secondary: #4fd1ff;
+  --accent-green: #00e38c;
+  --accent-warning: #ffb648;
+  --input: #070b18;
+  --input-border: rgba(255, 255, 255, 0.08);
+  --shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 12px 40px 0 rgba(0, 0, 0, 0.4);
+  --aurora-opacity: 1;
+}
+
+@theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Outfit", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Theme-aware utilities */
+  --color-deep-space: var(--background);
+  --color-primary: #7C5CFF;
+  --color-secondary: var(--accent-secondary);
+  --color-accent: var(--accent-green);
+  --color-warning: var(--accent-warning);
+  --color-muted-gray: var(--text-muted);
+  
+  --color-glass-card: var(--surface);
+  --color-glass-border: var(--border);
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(124, 92, 255, 0.3);
+  border-radius: 99px;
+  border: 2px solid var(--background);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 92, 255, 0.5);
+}
+
+/* HTML base configurations */
+html {
+  scroll-behavior: smooth;
+  background-color: var(--background);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--background);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Headings font overrides */
+h1, h2, h3, h4, .font-sans-display {
+  font-family: var(--font-display) !important;
+}
+
+/* Smooth transitions */
+a, button, input, select, textarea {
+  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+/* Aurora Backdrop Animation */
+.aurora-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -2;
+  overflow: hidden;
+  background-color: var(--background);
+  opacity: var(--aurora-opacity);
+  transition: background-color 0.3s ease, opacity 0.3s ease;
+}
+
+.aurora-glow-1 {
+  position: absolute;
+  top: -10%;
+  left: -10%;
+  width: 60vw;
+  height: 60vh;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(124, 92, 255, 0.15) 0%, rgba(124, 92, 255, 0) 70%);
+  filter: blur(80px);
+  animation: aurora-move-1 25s ease-in-out infinite alternate;
+}
+
+.aurora-glow-2 {
+  position: absolute;
+  bottom: -10%;
+  right: -10%;
+  width: 70vw;
+  height: 70vh;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(79, 209, 255, 0.12) 0%, rgba(79, 209, 255, 0) 70%);
+  filter: blur(80px);
+  animation: aurora-move-2 30s ease-in-out infinite alternate;
+}
+
+.aurora-glow-3 {
+  position: absolute;
+  top: 30%;
+  left: 40%;
+  width: 50vw;
+  height: 50vh;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 227, 140, 0.06) 0%, rgba(0, 227, 140, 0) 70%);
+  filter: blur(80px);
+  animation: aurora-move-3 28s ease-in-out infinite alternate;
+}
+
+/* Light Rays animation */
+.light-ray {
+  position: absolute;
+  top: -30%;
+  left: -20%;
+  width: 150%;
+  height: 80%;
+  background: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(124, 92, 255, 0.02) 45%,
+    rgba(79, 209, 255, 0.02) 55%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: rotate(-15deg);
+  filter: blur(30px);
+  animation: ray-sweep 15s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes aurora-move-1 {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  50% { transform: translate(10vw, 5vh) rotate(90deg) scale(1.1); }
+  100% { transform: translate(-5vw, 15vh) rotate(180deg) scale(0.9); }
+}
+
+@keyframes aurora-move-2 {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  50% { transform: translate(-10vw, -10vh) rotate(-90deg) scale(1.15); }
+  100% { transform: translate(5vw, -5vh) rotate(-180deg) scale(0.85); }
+}
+
+@keyframes aurora-move-3 {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  100% { transform: translate(15vw, -8vh) rotate(360deg); }
+}
+
+@keyframes ray-sweep {
+  0% { transform: translate(-20%, -20%) rotate(-15deg); }
+  50% { transform: translate(10%, 10%) rotate(-15deg); }
+  100% { transform: translate(-20%, -20%) rotate(-15deg); }
+}
+
+/* Premium Glassmorphic utilities */
+.glass {
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.glass-card {
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  border-radius: 24px;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* Card hover scaling and border glows */
+.glass-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Glowing buttons */
+.btn-premium-primary {
+  background: linear-gradient(135deg, #7C5CFF 0%, #6340f1 100%);
+  color: #FFFFFF !important;
+  font-weight: 600;
+  border-radius: 14px;
+  box-shadow: 0 4px 14px 0 rgba(124, 92, 255, 0.3);
+  cursor: pointer;
+}
+
+.btn-premium-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px 0 rgba(124, 92, 255, 0.5);
+  filter: brightness(1.1);
+}
+
+.btn-premium-primary:active {
+  transform: translateY(1px);
+}
+
+.btn-premium-secondary {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-weight: 600;
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.btn-premium-secondary:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-hover);
+}
+
+/* Skeleton Loading Shimmer */
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--surface);
+  border-radius: 12px;
+}
+
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(124, 92, 255, 0.05) 20%,
+    rgba(124, 92, 255, 0.1) 60%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmer 1.8s infinite;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Typing animation */
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  background-color: #7C5CFF;
+  border-radius: 50%;
+  animation: pulse-dot 1.2s infinite;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+  background-color: #4FD1FF;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+  background-color: #00E38C;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(0.6); opacity: 0.4; }
+  50% { transform: scale(1.2); opacity: 1; }
+}
+
+/* Notion-style markdown body */
+.markdown-body {
+  font-size: 0.98rem;
+  line-height: 1.8;
+  color: var(--text-secondary);
+}
+
+.markdown-body h1 {
+  font-family: var(--font-display);
+  font-size: 1.85rem;
+  font-weight: 800;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.markdown-body h2 {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 700;
+  margin-top: 1.8rem;
+  margin-bottom: 0.8rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.markdown-body h3 {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.6rem;
+  color: var(--text-primary);
+}
+
+.markdown-body p {
+  margin-bottom: 1.2rem;
+  color: var(--text-secondary);
+}
+
+.markdown-body ul, .markdown-body ol {
+  margin-bottom: 1.4rem;
+  padding-left: 1.5rem;
+}
+
+.markdown-body ul {
+  list-style-type: disc;
+}
+
+.markdown-body ol {
+  list-style-type: decimal;
+}
+
+.markdown-body li {
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary);
+}
+
+/* Notion Checkboxes */
+.markdown-body li input[type="checkbox"] {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-right: 0.6rem;
+  accent-color: #7C5CFF;
+  vertical-align: middle;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+/* Notion Callout Blocks */
+.markdown-body blockquote {
+  border-left: 4px solid #7C5CFF;
+  padding: 1rem 1.25rem;
+  margin: 1.5rem 0;
+  border-radius: 8px;
+  background-color: rgba(124, 92, 255, 0.06);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+}
+
+.markdown-body blockquote p {
+  margin-bottom: 0;
+  color: var(--text-primary);
+}
+
+/* Notion Tables */
+.markdown-body table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 1.8rem 0;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.markdown-body th {
+  background-color: rgba(124, 92, 255, 0.08);
+  font-weight: 700;
+  text-align: left;
+  padding: 0.9rem 1.2rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.markdown-body td {
+  padding: 0.9rem 1.2rem;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.markdown-body tr:last-child td {
+  border-bottom: none;
+}
+
+/* Notion Summary / details */
+.markdown-body details {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.2rem;
+  margin-bottom: 1.2rem;
+}
+
+.markdown-body details[open] {
+  border-color: rgba(124, 92, 255, 0.3);
+  box-shadow: 0 4px 20px rgba(124, 92, 255, 0.1);
+}
+
+.markdown-body summary {
+  font-weight: 700;
+  cursor: pointer;
+  outline: none;
+  display: flex;
+  align-items: center;
+  user-select: none;
+  color: var(--text-primary);
+}
+
+/* Code & Pre Formatting */
+.markdown-body code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background-color: rgba(124, 92, 255, 0.1);
+  padding: 0.2rem 0.4rem;
+  border-radius: 6px;
+  color: var(--accent-secondary);
+}
+
+.markdown-body pre {
+  background-color: #0b0f19;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 1.25rem;
+  border-radius: 16px;
+  overflow-x: auto;
+  margin: 1.8rem 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.markdown-body pre code {
+  background-color: transparent;
+  padding: 0;
+  color: #f8fafc;
+  font-size: 0.9rem;
+}

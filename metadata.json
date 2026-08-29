@@ -1,0 +1,6 @@
+{
+  "name": "Lumina AI",
+  "description": "Lumina AI is an AI-powered learning platform that helps learners discover the best online courses, generate study notes, practice with quizzes, prepare for interviews, revise efficiently, and receive personalized guidance from an AI tutor.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
