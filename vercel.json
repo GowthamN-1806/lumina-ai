@@ -2,14 +2,6 @@
   "version": 2,
   "rewrites": [
     {
-      "source": "/api/recommend",
-      "destination": "/api/recommend"
-    },
-    {
-      "source": "/api/tutor",
-      "destination": "/api/tutor"
-    },
-    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
