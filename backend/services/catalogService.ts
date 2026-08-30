@@ -55,74 +55,87 @@ export function tokenize(text: string): string[] {
     .filter((t) => t.length > 1);
 }
 
-const TOPIC_SYNONYMS: Record<string, string[]> = {
-  python: ["python", "py"],
-  java: ["java"],
-  cpp: ["c++", "cpp", "cplusplus"],
-  c: ["c", "c-programming"],
-  javascript: ["javascript", "js", "ecmascript"],
-  typescript: ["typescript", "ts"],
-  html: ["html", "html5"],
-  css: ["css", "css3", "styling"],
-  react: ["react", "reactjs", "react.js"],
-  nodejs: ["node", "nodejs", "node.js", "express"],
-  sql: ["sql", "mysql", "postgresql", "postgres"],
-  dbms: ["dbms", "database", "rdbms", "database-management"],
-  os: ["operating-system", "operating-systems", "os"],
-  networks: ["network", "networks", "networking", "computer-networks", "tcp"],
-  dsa: ["data-structures", "algorithms", "dsa", "leetcode"],
-  ai: ["ai", "artificial-intelligence", "artificial intelligence"],
-  ml: ["machine-learning", "ml"],
-  dl: ["deep-learning", "dl", "neural-network", "neural-networks"],
-  datascience: ["data-science", "data-science", "analytics"],
-  cybersecurity: ["cybersecurity", "cyber-security", "security", "infosec", "ethical-hacking"],
-  cloud: ["cloud", "cloud-computing"],
-  aws: ["aws", "amazon-web-services"],
-  azure: ["azure", "microsoft-azure"],
-  docker: ["docker", "container", "containers"],
-  kubernetes: ["kubernetes", "k8s"],
-  git: ["git", "version-control"],
-  github: ["github", "git-hub"],
-  flutter: ["flutter", "dart"],
-  android: ["android", "android-development", "kotlin-android"],
-  unity: ["unity", "game-development", "gamedev"],
-  uiux: ["ui", "ux", "ui-ux", "ui/ux", "user-experience", "user-interface"],
-  figma: ["figma", "design-tool"],
-  web: ["web-development", "web", "full-stack", "fullstack"],
-};
+const STOP_WORDS = new Set([
+  "course", "courses", "learning", "tutorial", "tutorials", "for", "and", "the",
+  "in", "of", "to", "a", "an", "guide", "full", "masterclass", "complete", "bootcamp",
+  "beginner", "beginners", "intermediate", "advanced"
+]);
+
+const CONCEPT_MAP = [
+  { key: "ml", synonyms: ["machine learning", "machine-learning", "ml", "machinelearning"] },
+  { key: "ai", synonyms: ["artificial intelligence", "artificial-intelligence", "ai", "artificialintelligence"] },
+  { key: "dl", synonyms: ["deep learning", "deep-learning", "dl", "neural network", "neural networks", "neural-network"] },
+  { key: "ds", synonyms: ["data science", "data-science", "datascience", "data analytics"] },
+  { key: "py", synonyms: ["python", "py", "python3"] },
+  { key: "js", synonyms: ["javascript", "js", "ecmascript"] },
+  { key: "ts", synonyms: ["typescript", "ts"] },
+  { key: "web", synonyms: ["web development", "web-development", "full stack", "fullstack", "frontend", "backend", "web dev"] },
+  { key: "htmlcss", synonyms: ["html", "css", "html5", "css3", "web design", "responsive web design"] },
+  { key: "react", synonyms: ["react", "reactjs", "react.js"] },
+  { key: "node", synonyms: ["node", "nodejs", "node.js", "express"] },
+  { key: "sql", synonyms: ["sql", "mysql", "postgresql", "postgres", "database", "dbms", "rdbms"] },
+  { key: "dsa", synonyms: ["data structures", "algorithms", "dsa", "leetcode", "problem solving"] },
+  { key: "os", synonyms: ["operating system", "operating-system", "operating systems", "os"] },
+  { key: "networks", synonyms: ["computer networks", "networking", "network", "tcp/ip", "computer-networks"] },
+  { key: "cloud", synonyms: ["cloud computing", "cloud", "aws", "azure", "docker", "kubernetes", "devops"] },
+  { key: "cyber", synonyms: ["cybersecurity", "cyber security", "security", "ethical hacking", "infosec"] },
+  { key: "mobile", synonyms: ["android", "flutter", "ios", "react native", "mobile development"] }
+];
+
+function normText(text: string): string {
+  return (text || "").toLowerCase().replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
+}
 
 export function expandTopics(rawTopics: string[]): Set<string> {
   const expanded = new Set<string>();
-  const input = rawTopics.join(" ").toLowerCase();
+  const input = normText(rawTopics.join(" "));
 
-  for (const [key, synonyms] of Object.entries(TOPIC_SYNONYMS)) {
-    if (synonyms.some((s) => input.includes(s.replace(/-/g, " ")) || input.includes(s))) {
-      expanded.add(key);
-      synonyms.forEach((s) => expanded.add(s));
+  for (const group of CONCEPT_MAP) {
+    for (const syn of group.synonyms) {
+      const sNorm = normText(syn);
+      if (sNorm.length <= 3) {
+        const regex = new RegExp(`\\b${sNorm}\\b`, "i");
+        if (regex.test(input)) {
+          expanded.add(group.key);
+          group.synonyms.forEach((s) => expanded.add(s));
+          break;
+        }
+      } else if (input.includes(sNorm)) {
+        expanded.add(group.key);
+        group.synonyms.forEach((s) => expanded.add(s));
+        break;
+      }
     }
   }
 
   rawTopics.forEach((t) => {
-    tokenize(t).forEach((tok) => expanded.add(tok));
+    tokenize(t).forEach((tok) => {
+      if (!STOP_WORDS.has(tok)) expanded.add(tok);
+    });
   });
 
   return expanded;
 }
 
 export function courseMatchesTopics(course: CatalogCourse, topics: Set<string>): number {
-  const titleHaystack = course.title.toLowerCase();
-  const tagHaystack = [...course.skills, ...course.tags].join(" ").toLowerCase();
-  const descHaystack = course.description.toLowerCase();
+  const titleHaystack = normText(course.title);
+  const tagHaystack = normText([...course.skills, ...course.tags].join(" "));
+  const descHaystack = normText(course.description);
 
   let score = 0;
   for (const topic of topics) {
-    const normalized = topic.replace(/-/g, " ");
-    if (titleHaystack.includes(normalized) || titleHaystack.includes(topic)) {
-      score += topic.length > 3 ? 4 : 2;
-    } else if (tagHaystack.includes(normalized) || tagHaystack.includes(topic)) {
-      score += topic.length > 3 ? 3 : 1;
-    } else if (descHaystack.includes(normalized) || descHaystack.includes(topic)) {
-      score += 1;
+    const normalized = normText(topic);
+    if (normalized.length <= 1 || STOP_WORDS.has(normalized)) continue;
+
+    if (normalized.length <= 3) {
+      const regex = new RegExp(`\\b${normalized}\\b`, "i");
+      if (regex.test(titleHaystack)) score += 8;
+      else if (regex.test(tagHaystack)) score += 5;
+      else if (regex.test(descHaystack)) score += 2;
+    } else {
+      if (titleHaystack.includes(normalized)) score += 8;
+      else if (tagHaystack.includes(normalized)) score += 5;
+      else if (descHaystack.includes(normalized)) score += 2;
     }
   }
   return score;
@@ -141,10 +154,99 @@ export function difficultyMatch(
   return 0.1;
 }
 
-export function findSimilarCourses(
-  courseId: string,
-  limit = 5
-): CatalogCourse[] {
+export function searchAndRankCatalog(query: string, platformFilter = "Any"): CatalogCourse[] {
+  if (allCourses.length === 0) {
+    initCatalog();
+  }
+
+  const qNorm = normText(query);
+  const rawTokens = qNorm.split(" ").filter((t) => t.length > 0 && !STOP_WORDS.has(t));
+
+  const matchedConcepts = new Set<string>();
+  for (const group of CONCEPT_MAP) {
+    for (const syn of group.synonyms) {
+      const synNorm = normText(syn);
+      if (synNorm.length <= 3) {
+        const regex = new RegExp(`\\b${synNorm}\\b`, "i");
+        if (regex.test(qNorm)) {
+          matchedConcepts.add(group.key);
+          break;
+        }
+      } else if (qNorm.includes(synNorm)) {
+        matchedConcepts.add(group.key);
+        break;
+      }
+    }
+  }
+
+  let subset = allCourses;
+  if (platformFilter && platformFilter.toLowerCase() !== "any") {
+    const pNorm = normText(platformFilter);
+    subset = allCourses.filter((c) => {
+      const cpNorm = normText(c.platform);
+      return cpNorm.includes(pNorm) || pNorm.includes(cpNorm);
+    });
+  }
+
+  const scored = subset.map((c) => {
+    const title = normText(c.title);
+    const tags = normText((c.tags || []).join(" "));
+    const skills = normText((c.skills || []).join(" "));
+    const desc = normText(c.description);
+    const fullText = `${title} ${tags} ${skills} ${desc}`;
+
+    let score = 0;
+
+    if (title.includes(qNorm) && qNorm.length > 2) score += 30;
+    else if (fullText.includes(qNorm) && qNorm.length > 2) score += 15;
+
+    for (const token of rawTokens) {
+      if (token.length <= 1) continue;
+      if (token.length <= 3) {
+        const regex = new RegExp(`\\b${token}\\b`, "i");
+        if (regex.test(title)) score += 10;
+        else if (regex.test(tags) || regex.test(skills)) score += 6;
+        else if (regex.test(desc)) score += 2;
+      } else {
+        if (title.includes(token)) score += 10;
+        else if (tags.includes(token) || skills.includes(token)) score += 6;
+        else if (desc.includes(token)) score += 2;
+      }
+    }
+
+    for (const conceptKey of matchedConcepts) {
+      const conceptObj = CONCEPT_MAP.find((g) => g.key === conceptKey);
+      if (!conceptObj) continue;
+      for (const syn of conceptObj.synonyms) {
+        const sNorm = normText(syn);
+        if (sNorm.length <= 3) {
+          const regex = new RegExp(`\\b${sNorm}\\b`, "i");
+          if (regex.test(title)) { score += 18; break; }
+          if (regex.test(tags) || regex.test(skills)) { score += 12; break; }
+          if (regex.test(desc)) { score += 4; break; }
+        } else {
+          if (title.includes(sNorm)) { score += 18; break; }
+          if (tags.includes(sNorm) || skills.includes(sNorm)) { score += 12; break; }
+          if (desc.includes(sNorm)) { score += 4; break; }
+        }
+      }
+    }
+
+    // Base fallback score for platform subset if rawTokens & concepts are empty
+    if (score === 0 && rawTokens.length === 0 && matchedConcepts.size === 0) {
+      score = 5;
+    }
+
+    return { course: c, score };
+  });
+
+  const matches = scored.filter((item) => item.score > 0);
+  matches.sort((a, b) => b.score - a.score || b.course.rating - a.course.rating);
+
+  return matches.map((m) => m.course);
+}
+
+export function findSimilarCourses(courseId: string, limit = 5): CatalogCourse[] {
   const source = getCourseById(courseId);
   if (!source) return [];
 
@@ -174,11 +276,5 @@ export function findSimilarCourses(
 }
 
 export function searchCatalogByText(query: string, limit = 20): CatalogCourse[] {
-  const topics = expandTopics([query]);
-  const scored = allCourses
-    .map((c) => ({ course: c, score: courseMatchesTopics(c, topics) }))
-    .filter((s) => s.score > 0)
-    .sort((a, b) => b.score - a.score || b.course.rating - a.course.rating);
-
-  return scored.slice(0, limit).map((s) => s.course);
+  return searchAndRankCatalog(query, "Any").slice(0, limit);
 }
