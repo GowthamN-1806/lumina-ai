@@ -4,7 +4,9 @@ import coursesData from "../data/courses.json";
 import type { CatalogCourse, Difficulty } from "../types/catalog.ts";
 
 let allCourses: CatalogCourse[] = (coursesData.courses || []) as CatalogCourse[];
-let coursesById = new Map<string, CatalogCourse>(allCourses.map((c) => [c.id, c]));
+let coursesById = new Map<string, CatalogCourse>(
+  allCourses.map((c) => [c.id, c])
+);
 
 export function initCatalog(): void {
   try {
@@ -17,6 +19,7 @@ export function initCatalog(): void {
       ];
 
       let loadedRaw: string | null = null;
+
       for (const p of candidatePaths) {
         if (fs.existsSync(p)) {
           loadedRaw = fs.readFileSync(p, "utf-8");
@@ -25,18 +28,30 @@ export function initCatalog(): void {
       }
 
       if (loadedRaw) {
-        const data = JSON.parse(loadedRaw) as { courses: CatalogCourse[] };
+        const data = JSON.parse(loadedRaw) as {
+          courses: CatalogCourse[];
+        };
+
         allCourses = data.courses || [];
       } else {
         allCourses = (coursesData.courses || []) as CatalogCourse[];
       }
     }
+
     coursesById = new Map(allCourses.map((c) => [c.id, c]));
+
     console.log(`[Catalog] Loaded ${allCourses.length} verified courses`);
   } catch (err: any) {
-    console.error("[Catalog] Error initializing catalog:", err.message || err);
+    console.error(
+      "[Catalog] Error initializing catalog:",
+      err.message || err
+    );
+
     allCourses = (coursesData.courses || []) as CatalogCourse[];
-    coursesById = new Map(allCourses.map((c) => [c.id, c]));
+
+    coursesById = new Map(
+      allCourses.map((c) => [c.id, c])
+    );
   }
 }
 
@@ -48,9 +63,15 @@ export function getAllCatalogCourses(): CatalogCourse[] {
   return allCourses;
 }
 
-export function getCourseById(id: string): CatalogCourse | undefined {
+export function getCourseById(
+  id: string
+): CatalogCourse | undefined {
   return coursesById.get(id);
 }
+
+/* =========================================================
+   TEXT NORMALIZATION
+   ========================================================= */
 
 export function tokenize(text: string): string[] {
   return text
@@ -60,229 +81,954 @@ export function tokenize(text: string): string[] {
     .filter((t) => t.length > 1);
 }
 
+/*
+ * IMPORTANT:
+ * "development" and "dev" are intentionally NOT stop words.
+ *
+ * Searches such as:
+ *   Web Development
+ *   Game Development
+ *   Mobile Development
+ *   Backend Development
+ *
+ * need these words for accurate matching.
+ */
 const STOP_WORDS = new Set([
-  "course", "courses", "learning", "tutorial", "tutorials", "for", "and", "the",
-  "in", "of", "to", "a", "an", "guide", "full", "masterclass", "complete", "bootcamp",
-  "beginner", "beginners", "intermediate", "advanced", "development", "dev"
+  "course",
+  "courses",
+  "learning",
+  "tutorial",
+  "tutorials",
+  "for",
+  "and",
+  "the",
+  "in",
+  "of",
+  "to",
+  "a",
+  "an",
+  "guide",
+  "full",
+  "masterclass",
+  "complete",
+  "bootcamp",
+  "learn",
+  "best",
+  "online",
 ]);
 
+/* =========================================================
+   CONCEPT MAP
+   ========================================================= */
+
 const CONCEPT_MAP = [
-  { key: "web", synonyms: ["web development", "web-development", "web dev", "frontend development", "front end", "back end", "backend", "full stack", "fullstack", "react", "javascript", "js", "html", "css", "web design"] },
-  { key: "ml", synonyms: ["machine learning", "machine-learning", "ml", "machinelearning", "deep learning", "neural network", "neural networks"] },
-  { key: "ai", synonyms: ["artificial intelligence", "artificial-intelligence", "ai", "artificialintelligence"] },
-  { key: "dl", synonyms: ["deep learning", "deep-learning", "dl", "neural network", "neural networks", "neural-network"] },
-  { key: "ds", synonyms: ["data science", "data-science", "datascience", "data analytics", "data analysis"] },
-  { key: "py", synonyms: ["python", "py", "python3", "programming for everybody"] },
-  { key: "gamedev", synonyms: ["game development", "game dev", "gamedev", "unity", "game design", "c#"] },
-  { key: "js", synonyms: ["javascript", "js", "ecmascript"] },
-  { key: "ts", synonyms: ["typescript", "ts"] },
-  { key: "react", synonyms: ["react", "reactjs", "react.js"] },
-  { key: "node", synonyms: ["node", "nodejs", "node.js", "express"] },
-  { key: "sql", synonyms: ["sql", "mysql", "postgresql", "postgres", "database", "dbms", "rdbms"] },
-  { key: "dsa", synonyms: ["data structures", "algorithms", "dsa", "leetcode", "problem solving"] },
-  { key: "os", synonyms: ["operating system", "operating-system", "operating systems", "os"] },
-  { key: "networks", synonyms: ["computer networks", "networking", "network", "tcp/ip", "computer-networks"] },
-  { key: "cloud", synonyms: ["cloud computing", "cloud", "aws", "azure", "docker", "kubernetes", "devops"] },
-  { key: "cyber", synonyms: ["cybersecurity", "cyber security", "security", "ethical hacking", "infosec"] },
-  { key: "mobile", synonyms: ["android", "flutter", "ios", "react native", "mobile development"] }
+  {
+    key: "web",
+    synonyms: [
+      "web development",
+      "web-development",
+      "web dev",
+      "frontend development",
+      "front end",
+      "front-end",
+      "backend development",
+      "back end",
+      "back-end",
+      "backend",
+      "full stack",
+      "fullstack",
+      "full-stack",
+      "react",
+      "javascript",
+      "js",
+      "html",
+      "css",
+      "web design",
+      "responsive web design",
+    ],
+  },
+
+  {
+    key: "ml",
+    synonyms: [
+      "machine learning",
+      "machine-learning",
+      "ml",
+      "machinelearning",
+      "deep learning",
+      "neural network",
+      "neural networks",
+    ],
+  },
+
+  {
+    key: "ai",
+    synonyms: [
+      "artificial intelligence",
+      "artificial-intelligence",
+      "ai",
+      "artificialintelligence",
+    ],
+  },
+
+  {
+    key: "dl",
+    synonyms: [
+      "deep learning",
+      "deep-learning",
+      "dl",
+      "neural network",
+      "neural networks",
+      "neural-network",
+    ],
+  },
+
+  {
+    key: "ds",
+    synonyms: [
+      "data science",
+      "data-science",
+      "datascience",
+      "data analytics",
+      "data analysis",
+    ],
+  },
+
+  {
+    key: "py",
+    synonyms: [
+      "python",
+      "py",
+      "python3",
+      "programming for everybody",
+    ],
+  },
+
+  {
+    key: "gamedev",
+    synonyms: [
+      "game development",
+      "game development",
+      "game dev",
+      "gamedev",
+      "unity",
+      "game design",
+      "unreal engine",
+      "godot",
+      "c#",
+    ],
+  },
+
+  {
+    key: "js",
+    synonyms: [
+      "javascript",
+      "java script",
+      "js",
+      "ecmascript",
+    ],
+  },
+
+  {
+    key: "ts",
+    synonyms: [
+      "typescript",
+      "type script",
+      "ts",
+    ],
+  },
+
+  {
+    key: "react",
+    synonyms: [
+      "react",
+      "reactjs",
+      "react.js",
+    ],
+  },
+
+  {
+    key: "node",
+    synonyms: [
+      "node",
+      "nodejs",
+      "node.js",
+      "express",
+      "expressjs",
+    ],
+  },
+
+  {
+    key: "sql",
+    synonyms: [
+      "sql",
+      "mysql",
+      "postgresql",
+      "postgres",
+      "database",
+      "dbms",
+      "rdbms",
+    ],
+  },
+
+  {
+    key: "dsa",
+    synonyms: [
+      "data structures",
+      "algorithms",
+      "dsa",
+      "leetcode",
+      "problem solving",
+    ],
+  },
+
+  {
+    key: "os",
+    synonyms: [
+      "operating system",
+      "operating-system",
+      "operating systems",
+      "os",
+    ],
+  },
+
+  {
+    key: "networks",
+    synonyms: [
+      "computer networks",
+      "networking",
+      "network",
+      "tcp/ip",
+      "computer-networks",
+    ],
+  },
+
+  {
+    key: "cloud",
+    synonyms: [
+      "cloud computing",
+      "cloud",
+      "aws",
+      "azure",
+      "docker",
+      "kubernetes",
+      "devops",
+    ],
+  },
+
+  {
+    key: "cyber",
+    synonyms: [
+      "cybersecurity",
+      "cyber security",
+      "security",
+      "ethical hacking",
+      "infosec",
+    ],
+  },
+
+  {
+    key: "mobile",
+    synonyms: [
+      "android",
+      "flutter",
+      "ios",
+      "react native",
+      "mobile development",
+    ],
+  },
 ];
 
+/* =========================================================
+   HELPERS
+   ========================================================= */
+
 function normText(text: string): string {
-  return (text || "").toLowerCase().replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
+  return (text || "")
+    .toLowerCase()
+    .replace(/[-_]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-export function expandTopics(rawTopics: string[]): Set<string> {
+function containsWord(
+  text: string,
+  word: string
+): boolean {
+  if (!word) return false;
+
+  const normalizedText = normText(text);
+  const normalizedWord = normText(word);
+
+  if (normalizedWord.length <= 3) {
+    return new RegExp(
+      `\\b${normalizedWord}\\b`,
+      "i"
+    ).test(normalizedText);
+  }
+
+  return normalizedText.includes(normalizedWord);
+}
+
+function getCourseSearchText(
+  course: CatalogCourse
+): {
+  title: string;
+  tags: string;
+  skills: string;
+  description: string;
+} {
+  return {
+    title: normText(course.title),
+    tags: normText((course.tags || []).join(" ")),
+    skills: normText((course.skills || []).join(" ")),
+    description: normText(course.description),
+  };
+}
+
+/* =========================================================
+   TOPIC EXPANSION
+   ========================================================= */
+
+export function expandTopics(
+  rawTopics: string[]
+): Set<string> {
   const expanded = new Set<string>();
-  const input = normText(rawTopics.join(" "));
+
+  const input = normText(
+    rawTopics.join(" ")
+  );
 
   for (const group of CONCEPT_MAP) {
-    for (const syn of group.synonyms) {
-      const sNorm = normText(syn);
-      if (sNorm.length <= 3) {
-        const regex = new RegExp(`\\b${sNorm}\\b`, "i");
-        if (regex.test(input)) {
+    for (const synonym of group.synonyms) {
+      const synonymNorm = normText(synonym);
+
+      if (synonymNorm.length <= 3) {
+        if (containsWord(input, synonymNorm)) {
           expanded.add(group.key);
-          group.synonyms.forEach((s) => expanded.add(s));
+
+          group.synonyms.forEach((s) => {
+            expanded.add(normText(s));
+          });
+
           break;
         }
-      } else if (input.includes(sNorm)) {
+      } else if (input.includes(synonymNorm)) {
         expanded.add(group.key);
-        group.synonyms.forEach((s) => expanded.add(s));
+
+        group.synonyms.forEach((s) => {
+          expanded.add(normText(s));
+        });
+
         break;
       }
     }
   }
 
-  rawTopics.forEach((t) => {
-    tokenize(t).forEach((tok) => {
-      if (!STOP_WORDS.has(tok)) expanded.add(tok);
+  rawTopics.forEach((topic) => {
+    tokenize(topic).forEach((token) => {
+      if (!STOP_WORDS.has(token)) {
+        expanded.add(token);
+      }
     });
   });
 
   return expanded;
 }
 
-export function courseMatchesTopics(course: CatalogCourse, topics: Set<string>): number {
+/* =========================================================
+   BASIC TOPIC MATCHING
+   ========================================================= */
+
+export function courseMatchesTopics(
+  course: CatalogCourse,
+  topics: Set<string>
+): number {
   const titleHaystack = normText(course.title);
-  const tagHaystack = normText([...course.skills, ...course.tags].join(" "));
-  const descHaystack = normText(course.description);
+
+  const tagHaystack = normText(
+    [
+      ...(course.skills || []),
+      ...(course.tags || []),
+    ].join(" ")
+  );
+
+  const descHaystack = normText(
+    course.description
+  );
 
   let score = 0;
+
   for (const topic of topics) {
     const normalized = normText(topic);
-    if (normalized.length <= 1 || STOP_WORDS.has(normalized)) continue;
 
-    if (normalized.length <= 3) {
-      const regex = new RegExp(`\\b${normalized}\\b`, "i");
-      if (regex.test(titleHaystack)) score += 8;
-      else if (regex.test(tagHaystack)) score += 5;
-      else if (regex.test(descHaystack)) score += 2;
-    } else {
-      if (titleHaystack.includes(normalized)) score += 8;
-      else if (tagHaystack.includes(normalized)) score += 5;
-      else if (descHaystack.includes(normalized)) score += 2;
+    if (
+      normalized.length <= 1 ||
+      STOP_WORDS.has(normalized)
+    ) {
+      continue;
+    }
+
+    if (containsWord(titleHaystack, normalized)) {
+      score += 8;
+    } else if (
+      containsWord(tagHaystack, normalized)
+    ) {
+      score += 5;
+    } else if (
+      containsWord(descHaystack, normalized)
+    ) {
+      score += 2;
     }
   }
+
   return score;
 }
+
+/* =========================================================
+   DIFFICULTY
+   ========================================================= */
 
 export function difficultyMatch(
   courseDifficulty: Difficulty,
   userLevel: Difficulty
 ): number {
-  const levels: Difficulty[] = ["Beginner", "Intermediate", "Advanced"];
-  const courseIdx = levels.indexOf(courseDifficulty);
-  const userIdx = levels.indexOf(userLevel);
-  const diff = Math.abs(courseIdx - userIdx);
+  const levels: Difficulty[] = [
+    "Beginner",
+    "Intermediate",
+    "Advanced",
+  ];
+
+  const courseIdx =
+    levels.indexOf(courseDifficulty);
+
+  const userIdx =
+    levels.indexOf(userLevel);
+
+  const diff = Math.abs(
+    courseIdx - userIdx
+  );
+
   if (diff === 0) return 1;
   if (diff === 1) return 0.5;
+
   return 0.1;
 }
 
-export function searchAndRankCatalog(query: string, platformFilter = "Any"): CatalogCourse[] {
+/* =========================================================
+   MAIN COURSE SEARCH + RANKING
+   ========================================================= */
+
+export function searchAndRankCatalog(
+  query: string,
+  platformFilter = "Any"
+): CatalogCourse[] {
   if (allCourses.length === 0) {
     initCatalog();
   }
 
   const qNorm = normText(query);
-  const rawTokens = qNorm.split(" ").filter((t) => t.length > 0 && !STOP_WORDS.has(t));
 
-  const matchedConcepts = new Set<string>();
+  if (!qNorm) {
+    return [];
+  }
+
+  /*
+   * Create meaningful query tokens.
+   *
+   * IMPORTANT:
+   * "development" and "dev" remain searchable.
+   */
+  const rawTokens = qNorm
+    .split(/\s+/)
+    .filter((token) => token.length > 1)
+    .filter(
+      (token) => !STOP_WORDS.has(token)
+    );
+
+  /* -------------------------------------------------------
+     Detect concepts
+  ------------------------------------------------------- */
+
+  const matchedConcepts =
+    new Set<string>();
+
   for (const group of CONCEPT_MAP) {
-    for (const syn of group.synonyms) {
-      const synNorm = normText(syn);
-      if (synNorm.length <= 3) {
-        const regex = new RegExp(`\\b${synNorm}\\b`, "i");
-        if (regex.test(qNorm)) {
-          matchedConcepts.add(group.key);
+    for (const synonym of group.synonyms) {
+      const synonymNorm =
+        normText(synonym);
+
+      if (synonymNorm.length <= 3) {
+        if (
+          containsWord(
+            qNorm,
+            synonymNorm
+          )
+        ) {
+          matchedConcepts.add(
+            group.key
+          );
+
           break;
         }
-      } else if (qNorm.includes(synNorm)) {
-        matchedConcepts.add(group.key);
+      } else if (
+        qNorm.includes(synonymNorm)
+      ) {
+        matchedConcepts.add(
+          group.key
+        );
+
         break;
       }
     }
   }
 
-  let subset = allCourses;
-  if (platformFilter && platformFilter.toLowerCase() !== "any") {
-    const pNorm = normText(platformFilter);
-    subset = allCourses.filter((c) => {
-      const cpNorm = normText(c.platform);
-      return cpNorm.includes(pNorm) || pNorm.includes(cpNorm);
-    });
+  /*
+   * Expand concepts into search terms.
+   */
+  const expandedTerms =
+    new Set<string>(rawTokens);
 
-    if (subset.length === 0) {
-      subset = allCourses;
-    }
+  for (const conceptKey of matchedConcepts) {
+    const concept =
+      CONCEPT_MAP.find(
+        (group) =>
+          group.key === conceptKey
+      );
+
+    if (!concept) continue;
+
+    concept.synonyms.forEach(
+      (synonym) => {
+        expandedTerms.add(
+          normText(synonym)
+        );
+      }
+    );
   }
 
-  const scored = subset.map((c) => {
-    const title = normText(c.title);
-    const tags = normText((c.tags || []).join(" "));
-    const skills = normText((c.skills || []).join(" "));
-    const desc = normText(c.description);
-    const fullText = `${title} ${tags} ${skills} ${desc}`;
+  /* -------------------------------------------------------
+     Score EVERY course
+  ------------------------------------------------------- */
 
-    let score = 0;
+  const scored = allCourses.map(
+    (course) => {
+      const {
+        title,
+        tags,
+        skills,
+        description,
+      } = getCourseSearchText(course);
 
-    if (title.includes(qNorm) && qNorm.length > 2) score += 30;
-    else if (fullText.includes(qNorm) && qNorm.length > 2) score += 15;
+      let score = 0;
 
-    for (const token of rawTokens) {
-      if (token.length <= 1) continue;
-      if (token.length <= 3) {
-        const regex = new RegExp(`\\b${token}\\b`, "i");
-        if (regex.test(title)) score += 10;
-        else if (regex.test(tags) || regex.test(skills)) score += 6;
-        else if (regex.test(desc)) score += 2;
-      } else {
-        if (title.includes(token)) score += 10;
-        else if (tags.includes(token) || skills.includes(token)) score += 6;
-        else if (desc.includes(token)) score += 2;
+      /* Exact title match */
+
+      if (title === qNorm) {
+        score += 120;
       }
-    }
 
-    for (const conceptKey of matchedConcepts) {
-      const conceptObj = CONCEPT_MAP.find((g) => g.key === conceptKey);
-      if (!conceptObj) continue;
-      for (const syn of conceptObj.synonyms) {
-        const sNorm = normText(syn);
-        if (sNorm.length <= 3) {
-          const regex = new RegExp(`\\b${sNorm}\\b`, "i");
-          if (regex.test(title)) { score += 18; break; }
-          if (regex.test(tags) || regex.test(skills)) { score += 12; break; }
-          if (regex.test(desc)) { score += 4; break; }
-        } else {
-          if (title.includes(sNorm)) { score += 18; break; }
-          if (tags.includes(sNorm) || skills.includes(sNorm)) { score += 12; break; }
-          if (desc.includes(sNorm)) { score += 4; break; }
+      /* Title contains complete query */
+
+      else if (
+        title.includes(qNorm)
+      ) {
+        score += 80;
+      }
+
+      /* Tags / skills contain complete query */
+
+      else if (
+        tags.includes(qNorm) ||
+        skills.includes(qNorm)
+      ) {
+        score += 60;
+      }
+
+      /* Description contains complete query */
+
+      else if (
+        description.includes(qNorm)
+      ) {
+        score += 30;
+      }
+
+      /* ---------------------------------------------------
+         Individual query tokens
+      --------------------------------------------------- */
+
+      let matchedTokenCount = 0;
+
+      for (const token of rawTokens) {
+        const titleMatch =
+          containsWord(
+            title,
+            token
+          );
+
+        const tagMatch =
+          containsWord(
+            tags,
+            token
+          );
+
+        const skillMatch =
+          containsWord(
+            skills,
+            token
+          );
+
+        const descriptionMatch =
+          containsWord(
+            description,
+            token
+          );
+
+        if (titleMatch) {
+          score += 25;
+          matchedTokenCount++;
+        } else if (
+          tagMatch ||
+          skillMatch
+        ) {
+          score += 15;
+          matchedTokenCount++;
+        } else if (
+          descriptionMatch
+        ) {
+          score += 6;
+          matchedTokenCount++;
         }
       }
+
+      /*
+       * Reward courses matching multiple
+       * words in the user's query.
+       */
+      if (
+        rawTokens.length > 1 &&
+        matchedTokenCount ===
+          rawTokens.length
+      ) {
+        score += 25;
+      }
+
+      /* ---------------------------------------------------
+         Concept matching
+      --------------------------------------------------- */
+
+      for (const conceptKey of matchedConcepts) {
+        const concept =
+          CONCEPT_MAP.find(
+            (group) =>
+              group.key ===
+              conceptKey
+          );
+
+        if (!concept) continue;
+
+        let matched =
+          false;
+
+        for (
+          const synonym of
+            concept.synonyms
+        ) {
+          const synonymNorm =
+            normText(
+              synonym
+            );
+
+          if (
+            containsWord(
+              title,
+              synonymNorm
+            )
+          ) {
+            score += 30;
+            matched = true;
+            break;
+          }
+
+          if (
+            containsWord(
+              tags,
+              synonymNorm
+            ) ||
+            containsWord(
+              skills,
+              synonymNorm
+            )
+          ) {
+            score += 20;
+            matched = true;
+            break;
+          }
+
+          if (
+            containsWord(
+              description,
+              synonymNorm
+            )
+          ) {
+            score += 8;
+            matched = true;
+            break;
+          }
+        }
+
+        /*
+         * Small additional bonus when the course
+         * clearly belongs to the requested concept.
+         */
+        if (matched) {
+          score += 5;
+        }
+      }
+
+      /* ---------------------------------------------------
+         Platform preference
+      --------------------------------------------------- */
+
+      const requestedPlatform =
+        normText(
+          platformFilter
+        );
+
+      const coursePlatform =
+        normText(
+          course.platform
+        );
+
+      if (
+        requestedPlatform &&
+        requestedPlatform !==
+          "any"
+      ) {
+        if (
+          coursePlatform ===
+          requestedPlatform
+        ) {
+          score += 12;
+        }
+      }
+
+      /* ---------------------------------------------------
+         Rating
+         --------------------------------------------------- */
+
+      /*
+       * Rating should influence ranking,
+       * but NOT overpower relevance.
+       */
+      score +=
+        course.rating * 0.5;
+
+      return {
+        course,
+        score,
+        matchedTokenCount,
+      };
     }
+  );
 
-    if (score === 0 && (rawTokens.length === 0 || matchedConcepts.size > 0)) {
-      score = 5;
-    }
+  /* -------------------------------------------------------
+     Remove irrelevant courses
+  ------------------------------------------------------- */
 
-    return { course: c, score };
-  });
+  const matches = scored
+    .filter((item) => {
+      /*
+       * If there are explicit query tokens,
+       * require at least one meaningful match.
+       */
+      if (rawTokens.length > 0) {
+        return (
+          item.score >= 10 &&
+          item.matchedTokenCount > 0
+        );
+      }
 
-  const matches = scored.filter((item) => item.score > 0);
-  matches.sort((a, b) => b.score - a.score || b.course.rating - a.course.rating);
+      /*
+       * Concept-only queries can still match
+       * through concept synonyms.
+       */
+      if (
+        matchedConcepts.size > 0
+      ) {
+        return item.score >= 15;
+      }
 
-  return matches.map((m) => m.course);
+      return item.score >= 10;
+    })
+    .sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+
+      return (
+        b.course.rating -
+        a.course.rating
+      );
+    });
+
+  /* -------------------------------------------------------
+     Platform preference
+  ------------------------------------------------------- */
+
+  const requestedPlatform =
+    normText(
+      platformFilter
+    );
+
+  if (
+    requestedPlatform &&
+    requestedPlatform !==
+      "any"
+  ) {
+    matches.sort(
+      (a, b) => {
+        const aPreferred =
+          normText(
+            a.course.platform
+          ) === requestedPlatform;
+
+        const bPreferred =
+          normText(
+            b.course.platform
+          ) === requestedPlatform;
+
+        if (
+          aPreferred !==
+          bPreferred
+        ) {
+          return aPreferred
+            ? -1
+            : 1;
+        }
+
+        return (
+          b.score -
+            a.score ||
+          b.course.rating -
+            a.course.rating
+        );
+      }
+    );
+  }
+
+  return matches.map(
+    (item) => item.course
+  );
 }
 
-export function findSimilarCourses(courseId: string, limit = 5): CatalogCourse[] {
-  const source = getCourseById(courseId);
-  if (!source) return [];
+/* =========================================================
+   SIMILAR COURSES
+   ========================================================= */
 
-  const sourceTags = new Set(source.tags.map((t) => t.toLowerCase()));
+export function findSimilarCourses(
+  courseId: string,
+  limit = 5
+): CatalogCourse[] {
+  const source =
+    getCourseById(courseId);
+
+  if (!source) {
+    return [];
+  }
+
+  const sourceTags =
+    new Set(
+      source.tags.map(
+        (tag) =>
+          tag.toLowerCase()
+      )
+    );
 
   const scored = allCourses
-    .filter((c) => c.id !== courseId)
-    .map((c) => {
+    .filter(
+      (course) =>
+        course.id !== courseId
+    )
+    .map((course) => {
       let score = 0;
-      c.tags.forEach((tag) => {
-        if (sourceTags.has(tag.toLowerCase())) score += 3;
-      });
-      c.skills.forEach((skill) => {
-        source.skills.forEach((ss) => {
-          if (ss.toLowerCase() === skill.toLowerCase()) score += 2;
-        });
-      });
-      if (c.platform === source.platform) score += 1;
-      if (c.difficulty === source.difficulty) score += 1;
-      score += c.rating * 0.2;
-      return { course: c, score };
-    })
-    .filter((s) => s.score > 0)
-    .sort((a, b) => b.score - a.score);
 
-  return scored.slice(0, limit).map((s) => s.course);
+      course.tags.forEach(
+        (tag) => {
+          if (
+            sourceTags.has(
+              tag.toLowerCase()
+            )
+          ) {
+            score += 3;
+          }
+        }
+      );
+
+      course.skills.forEach(
+        (skill) => {
+          source.skills.forEach(
+            (sourceSkill) => {
+              if (
+                sourceSkill.toLowerCase() ===
+                skill.toLowerCase()
+              ) {
+                score += 2;
+              }
+            }
+          );
+        }
+      );
+
+      if (
+        course.platform ===
+        source.platform
+      ) {
+        score += 1;
+      }
+
+      if (
+        course.difficulty ===
+        source.difficulty
+      ) {
+        score += 1;
+      }
+
+      score +=
+        course.rating * 0.2;
+
+      return {
+        course,
+        score,
+      };
+    })
+    .filter(
+      (item) =>
+        item.score > 0
+    )
+    .sort(
+      (a, b) =>
+        b.score - a.score
+    );
+
+  return scored
+    .slice(0, limit)
+    .map(
+      (item) =>
+        item.course
+    );
 }
 
-export function searchCatalogByText(query: string, limit = 20): CatalogCourse[] {
-  return searchAndRankCatalog(query, "Any").slice(0, limit);
+/* =========================================================
+   SIMPLE TEXT SEARCH
+   ========================================================= */
+
+export function searchCatalogByText(
+  query: string,
+  limit = 20
+): CatalogCourse[] {
+  return searchAndRankCatalog(
+    query,
+    "Any"
+  ).slice(0, limit);
 }
