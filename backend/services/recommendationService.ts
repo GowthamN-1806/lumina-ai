@@ -25,8 +25,19 @@ export interface RecommendedCoursePayload {
   tags: string[];
 }
 
+const ALL_PLATFORMS = [
+  "Coursera",
+  "Udemy",
+  "YouTube",
+  "freeCodeCamp",
+  "edX",
+  "MIT OCW",
+  "NPTEL",
+  "Infosys Springboard",
+];
+
 function isBudgetMatch(course: CatalogCourse, budget: string): boolean {
-  const b = budget.toLowerCase();
+  const b = (budget || "").toLowerCase();
   if (b.includes("free")) {
     return course.isFree === true || course.certificate === false;
   }
@@ -37,8 +48,8 @@ function isBudgetMatch(course: CatalogCourse, budget: string): boolean {
 }
 
 function studyTimeScore(studyTime: string, duration: string): number {
-  const daily = studyTime.toLowerCase();
-  const dur = duration.toLowerCase();
+  const daily = (studyTime || "").toLowerCase();
+  const dur = (duration || "").toLowerCase();
   if (daily.includes("15") || daily.includes("30")) {
     if (dur.includes("hour") && !dur.includes("0")) {
       const hours = parseInt(dur, 10);
@@ -102,14 +113,12 @@ export function catalogToRecommendedCourse(
 
 function scoreCourse(course: CatalogCourse, intent: UserIntent, topics: Set<string>): number {
   const topicScore = courseMatchesTopics(course, topics);
-  if (topicScore === 0) return 0;
-
-  let score = topicScore * 0.4;
+  let score = topicScore > 0 ? topicScore * 0.5 : 0.2;
   score += difficultyMatch(course.difficulty, intent.skillLevel) * 0.25;
 
   const platform = normalizePlatformName(intent.preferredPlatform);
-  if (platform !== "Any" && course.platform === platform) {
-    score += 0.2;
+  if (platform !== "Any" && course.platform.toLowerCase() === platform.toLowerCase()) {
+    score += 0.4;
   } else if (platform === "Any") {
     score += 0.1;
   }
@@ -118,13 +127,13 @@ function scoreCourse(course: CatalogCourse, intent: UserIntent, topics: Set<stri
   score += studyTimeScore(intent.studyTime, course.duration) * 0.05;
 
   if (!isBudgetMatch(course, intent.budget)) {
-    score *= 0.3;
+    score *= 0.7;
   }
 
   return score;
 }
 
-export function recommendCourses(intent: UserIntent, limit = 6): RecommendedCoursePayload[] {
+export function recommendCourses(intent: UserIntent, limit = 8): RecommendedCoursePayload[] {
   const topics = expandTopics([intent.learningGoal, ...intent.topics]);
   const allCourses = getAllCatalogCourses();
   const platform = normalizePlatformName(intent.preferredPlatform);
@@ -145,14 +154,13 @@ export function recommendCourses(intent: UserIntent, limit = 6): RecommendedCour
       course,
       score: scoreCourse(course, intent, topics),
     }))
-    .filter((s) => s.score > 0)
     .sort((a, b) => b.score - a.score);
 
   const results: RecommendedCoursePayload[] = [];
   const seen = new Set<string>();
 
   if (platform === "Any") {
-    // Multi-platform diversification: pick top course per platform first
+    // Multi-platform diversification: Group courses by platform
     const platformGroups = new Map<string, Array<{ course: CatalogCourse; score: number }>>();
     for (const item of scored) {
       const p = item.course.platform;
@@ -160,17 +168,20 @@ export function recommendCourses(intent: UserIntent, limit = 6): RecommendedCour
       platformGroups.get(p)!.push(item);
     }
 
-    // Round 1: Select 1 top course from each distinct platform
-    for (const [p, items] of platformGroups.entries()) {
+    // Round 1: Select top course from EACH distinct platform so all platforms display!
+    for (const p of ALL_PLATFORMS) {
       if (results.length >= limit) break;
-      const top = items[0];
-      if (!seen.has(top.course.id)) {
-        seen.add(top.course.id);
-        results.push(catalogToRecommendedCourse(top.course, intent, top.score));
+      const items = platformGroups.get(p);
+      if (items && items.length > 0) {
+        const top = items[0];
+        if (!seen.has(top.course.id)) {
+          seen.add(top.course.id);
+          results.push(catalogToRecommendedCourse(top.course, intent, top.score));
+        }
       }
     }
 
-    // Round 2: Fill remaining slots with next highest scored overall
+    // Round 2: Fill remaining slots with next highest-scored overall
     for (const { course, score } of scored) {
       if (results.length >= limit) break;
       if (!seen.has(course.id)) {
@@ -178,36 +189,64 @@ export function recommendCourses(intent: UserIntent, limit = 6): RecommendedCour
         results.push(catalogToRecommendedCourse(course, intent, score));
       }
     }
+
+    // Round 3: If any major platforms are missing from results, append platform search cards so ALL platforms display
+    for (const p of ALL_PLATFORMS) {
+      if (results.length >= limit) break;
+      const hasPlatformInResults = results.some((r) => r.platform.toLowerCase() === p.toLowerCase());
+      if (!hasPlatformInResults) {
+        const searchUrl = getPlatformSearchUrl(p, intent.learningGoal);
+        const fallbackId = `official-search-${p.toLowerCase().replace(/\s+/g, "-")}`;
+        if (!seen.has(fallbackId)) {
+          seen.add(fallbackId);
+          results.push({
+            id: fallbackId,
+            name: `Explore ${intent.learningGoal} on ${p}`,
+            platform: p,
+            duration: "Self-paced",
+            difficulty: intent.skillLevel,
+            certificate: true,
+            rating: 4.8,
+            enrollUrl: searchUrl,
+            officialUrl: searchUrl,
+            whyRecommended: `Official verified ${p} catalog search results for ${intent.learningGoal}.`,
+            expectedOutcome: `Access live course catalog and certifications on ${p}.`,
+            instructor: `${p} Instructor Network`,
+            description: `Browse all official ${intent.learningGoal} courses available on ${p}.`,
+            skills: intent.topics.slice(0, 3),
+            tags: intent.topics,
+          });
+        }
+      }
+    }
   } else {
-    // Specific platform selected: select top matches for that platform
+    // Specific platform selected
     for (const { course, score } of scored) {
       if (seen.has(course.id)) continue;
       seen.add(course.id);
       results.push(catalogToRecommendedCourse(course, intent, score));
       if (results.length >= limit) break;
     }
-  }
 
-  // If results are sparse or empty for a requested platform, attach official search link
-  if (results.length < limit) {
-    const targetPlatform = platform !== "Any" ? platform : "Coursera";
-    const searchUrl = getPlatformSearchUrl(targetPlatform, intent.learningGoal);
-    const fallbackId = `official-search-${targetPlatform.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`;
+    // Append platform search card for the specific requested platform if needed
+    const searchUrl = getPlatformSearchUrl(platform, intent.learningGoal);
+    const fallbackId = `official-search-${platform.toLowerCase().replace(/\s+/g, "-")}`;
     if (!seen.has(fallbackId)) {
+      seen.add(fallbackId);
       results.push({
         id: fallbackId,
-        name: `Browse ${intent.learningGoal} Catalog on ${targetPlatform}`,
-        platform: targetPlatform,
+        name: `Explore All ${intent.learningGoal} Courses on ${platform}`,
+        platform: platform,
         duration: "Self-paced",
         difficulty: intent.skillLevel,
         certificate: true,
         rating: 4.8,
         enrollUrl: searchUrl,
         officialUrl: searchUrl,
-        whyRecommended: `Explore official verified ${targetPlatform} catalog search results for ${intent.learningGoal}.`,
-        expectedOutcome: `Access live course list and certifications directly on ${targetPlatform}.`,
-        instructor: `${targetPlatform} Verified Partner`,
-        description: `Official search destination for ${intent.learningGoal} courses on ${targetPlatform}.`,
+        whyRecommended: `Official verified ${platform} catalog search page for ${intent.learningGoal}.`,
+        expectedOutcome: `Browse live courses, degree programs, and certificates on ${platform}.`,
+        instructor: `${platform} Education Partner`,
+        description: `Official search results for ${intent.learningGoal} on ${platform}.`,
         skills: intent.topics.slice(0, 3),
         tags: intent.topics,
       });

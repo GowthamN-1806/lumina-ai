@@ -1444,7 +1444,6 @@ const app = express();
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// API: Generate course recommendation (hybrid: Gemini intent + study plan, catalog courses)
 app.post("/api/recommend", async (req, res) => {
   try {
     const { learningGoal, skillLevel, studyTime, completionTarget, platform, budget } = req.body;
@@ -1453,10 +1452,7 @@ app.post("/api/recommend", async (req, res) => {
       return res.status(400).json({ error: "Learning goal is required" });
     }
 
-    console.log("[DEBUG] /api/recommend - Hybrid request for goal:", learningGoal);
-
-    const clientApiKey = req.headers["x-gemini-api-key"] as string | undefined;
-    const aiInstance = getGeminiClient(clientApiKey);
+    console.log("[DEBUG] /api/recommend - Instant recommendation request for goal:", learningGoal);
 
     const formBody = {
       learningGoal,
@@ -1467,25 +1463,14 @@ app.post("/api/recommend", async (req, res) => {
       budget,
     };
 
-    // Instant rule-based intent extraction (0ms)
+    // Instant intent extraction & topic analysis (0ms)
     const intent = extractIntentFromForm(formBody);
 
-    // Instant verified course match across diverse platforms (0ms)
-    const courses = recommendCourses(intent, 6);
+    // Instant verified course match across ALL major platforms (0ms)
+    const courses = recommendCourses(intent, 8);
 
-    let studyPlan = generateMockStudyPlan(intent);
-
-    if (aiInstance) {
-      try {
-        const geminiPromise = generateStudyPlanWithGemini(aiInstance, intent);
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("Fast timeout for Gemini study plan")), 3000);
-        });
-        studyPlan = await Promise.race([geminiPromise, timeoutPromise]);
-      } catch (err: any) {
-        console.warn("[DEBUG] /api/recommend - Fast fallback engaged. Serving instant structured study plan.");
-      }
-    }
+    // Instant structured 3-phase syllabus & study plan (0ms)
+    const studyPlan = generateMockStudyPlan(intent);
 
     const response = {
       id: "rec-" + Math.random().toString(36).slice(2, 11),
@@ -1503,15 +1488,14 @@ app.post("/api/recommend", async (req, res) => {
     };
 
     console.log(
-      `[DEBUG] /api/recommend - Returned ${courses.length} verified courses for: ${intent.learningGoal}`
+      `[DEBUG] /api/recommend - Returned ${courses.length} multi-platform verified courses for: ${intent.learningGoal}`
     );
-    res.json(response);
+    return res.json(response);
   } catch (error: any) {
     console.error("[DEBUG] /api/recommend - Error:", error);
-    console.warn("[DEBUG] /api/recommend - Falling back to catalog-only recommendation");
     const intent = extractIntentFromForm(req.body);
     const studyPlan = generateMockStudyPlan(intent);
-    const courses = recommendCourses(intent, 5);
+    const courses = recommendCourses(intent, 8);
     return res.json({
       id: "rec-" + Math.random().toString(36).slice(2, 11),
       learningGoal: intent.learningGoal,
