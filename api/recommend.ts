@@ -1,27 +1,18 @@
 import { GoogleGenAI } from "@google/genai";
-
-import {
-  initCatalog,
-} from "../backend/services/catalogService.ts";
-
+import { initCatalog } from "../backend/services/catalogService";
 import {
   extractIntentFromForm,
   extractIntentWithGemini,
-} from "../backend/services/intentService.ts";
-
-import {
-  recommendCourses,
-} from "../backend/services/recommendationService.ts";
-
+} from "../backend/services/intentService";
+import { recommendCourses } from "../backend/services/recommendationService";
 import {
   generateMockStudyPlan,
   generateStudyPlanWithGemini,
-} from "../backend/services/studyPlanService.ts";
+} from "../backend/services/studyPlanService";
 
 // Initialize course catalog
 initCatalog();
 
-// Create Gemini client
 function getGeminiClient(customKey?: string): GoogleGenAI | null {
   const apiKey = customKey || process.env.GEMINI_API_KEY;
 
@@ -40,6 +31,20 @@ function getGeminiClient(customKey?: string): GoogleGenAI | null {
 }
 
 export default async function handler(req: any, res: any) {
+  // CORS Preflight Headers
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS,PATCH,DELETE,POST,PUT");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, x-gemini-api-key"
+  );
+
+  // Handle OPTIONS preflight
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
   // Only allow POST
   if (req.method !== "POST") {
     return res.status(405).json({
@@ -55,7 +60,7 @@ export default async function handler(req: any, res: any) {
       completionTarget,
       platform,
       budget,
-    } = req.body || {};
+    } = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
 
     // Validate learning goal
     if (!learningGoal) {
@@ -71,7 +76,7 @@ export default async function handler(req: any, res: any) {
 
     // Allow user's Gemini key through the request header
     const clientApiKey =
-      req.headers["x-gemini-api-key"] as string | undefined;
+      req.headers ? (req.headers["x-gemini-api-key"] as string | undefined) : undefined;
 
     const aiInstance = getGeminiClient(clientApiKey);
 
@@ -87,138 +92,72 @@ export default async function handler(req: any, res: any) {
     let intent;
     let studyPlan;
 
-    // -----------------------------------------
-    // AI recommendation
-    // -----------------------------------------
+    // Fast recommendation flow
+    intent = extractIntentFromForm(formBody);
+    studyPlan = generateMockStudyPlan(intent);
+
     if (aiInstance) {
       try {
-        intent = await extractIntentWithGemini(
-          aiInstance,
-          formBody
-        );
-
-        studyPlan = await generateStudyPlanWithGemini(
-          aiInstance,
-          intent
-        );
+        const geminiPromise = generateStudyPlanWithGemini(aiInstance, intent);
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("Fast timeout for Gemini study plan")), 2500);
+        });
+        studyPlan = await Promise.race([geminiPromise, timeoutPromise]);
       } catch (aiError: any) {
         console.warn(
-          "[API /api/recommend] Gemini failed. Using local fallback:",
+          "[API /api/recommend] Gemini timed out or failed. Using instant local study plan:",
           aiError?.message || aiError
         );
-
-        intent = extractIntentFromForm(formBody);
-        studyPlan = generateMockStudyPlan(intent);
       }
     }
 
-    // -----------------------------------------
-    // No Gemini key → local fallback
-    // -----------------------------------------
-    else {
-      console.log(
-        "[API /api/recommend] No Gemini key. Using local fallback."
-      );
-
-      intent = extractIntentFromForm(formBody);
-      studyPlan = generateMockStudyPlan(intent);
-    }
-
-    // -----------------------------------------
     // Get verified courses from catalog
-    // -----------------------------------------
-    const courses = recommendCourses(intent, 5);
+    const courses = recommendCourses(intent, 8);
 
-    // -----------------------------------------
     // Build response
-    // -----------------------------------------
     const response = {
       id: "rec-" + Math.random().toString(36).slice(2, 11),
-
       learningGoal: intent.learningGoal,
-
       skillLevel: intent.skillLevel,
-
       dailyStudyTime: intent.studyTime,
-
-      completionTarget:
-        intent.completionTarget || completionTarget,
-
-      estimatedCompletionTime:
-        studyPlan.estimatedCompletionTime,
-
+      completionTarget: intent.completionTarget || completionTarget,
+      estimatedCompletionTime: studyPlan.estimatedCompletionTime,
       summary: studyPlan.summary,
-
       roadmap: studyPlan.roadmap,
-
       courses,
-
       weeklyPlan: studyPlan.weeklyPlan,
-
-      skillsToLearnNext:
-        studyPlan.skillsToLearnNext,
-
+      skillsToLearnNext: studyPlan.skillsToLearnNext,
       createdAt: new Date().toISOString(),
     };
 
-    console.log(
-      `[API /api/recommend] Returned ${courses.length} courses`
-    );
-
+    console.log(`[API /api/recommend] Returned ${courses.length} courses`);
     return res.status(200).json(response);
-
   } catch (error: any) {
-    console.error(
-      "[API /api/recommend] Unexpected error:",
-      error
-    );
+    console.error("[API /api/recommend] Unexpected error:", error);
 
-    // -----------------------------------------
     // Final fallback
-    // -----------------------------------------
     try {
-      const formBody = req.body || {};
-
+      const formBody = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
       const intent = extractIntentFromForm(formBody);
-
       const studyPlan = generateMockStudyPlan(intent);
-
-      const courses = recommendCourses(intent, 5);
+      const courses = recommendCourses(intent, 8);
 
       return res.status(200).json({
         id: "rec-" + Math.random().toString(36).slice(2, 11),
-
         learningGoal: intent.learningGoal,
-
         skillLevel: intent.skillLevel,
-
         dailyStudyTime: intent.studyTime,
-
         completionTarget: intent.completionTarget,
-
-        estimatedCompletionTime:
-          studyPlan.estimatedCompletionTime,
-
+        estimatedCompletionTime: studyPlan.estimatedCompletionTime,
         summary: studyPlan.summary,
-
         roadmap: studyPlan.roadmap,
-
         courses,
-
         weeklyPlan: studyPlan.weeklyPlan,
-
-        skillsToLearnNext:
-          studyPlan.skillsToLearnNext,
-
+        skillsToLearnNext: studyPlan.skillsToLearnNext,
         createdAt: new Date().toISOString(),
       });
-
     } catch (fallbackError: any) {
-      console.error(
-        "[API /api/recommend] Fallback failed:",
-        fallbackError
-      );
-
+      console.error("[API /api/recommend] Fallback failed:", fallbackError);
       return res.status(500).json({
         error: "Failed to generate recommendation",
       });
