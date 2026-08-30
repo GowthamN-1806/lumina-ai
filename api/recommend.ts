@@ -1,14 +1,14 @@
 import { GoogleGenAI } from "@google/genai";
-import { initCatalog } from "../backend/services/catalogService";
+import { initCatalog } from "../backend/services/catalogService.js";
 import {
   extractIntentFromForm,
   extractIntentWithGemini,
-} from "../backend/services/intentService";
-import { recommendCourses } from "../backend/services/recommendationService";
+} from "../backend/services/intentService.js";
+import { recommendCourses } from "../backend/services/recommendationService.js";
 import {
   generateMockStudyPlan,
   generateStudyPlanWithGemini,
-} from "../backend/services/studyPlanService";
+} from "../backend/services/studyPlanService.js";
 
 // Initialize course catalog
 initCatalog();

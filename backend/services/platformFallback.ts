@@ -1,4 +1,4 @@
-import type { Platform } from "../types/catalog.ts";
+import type { Platform } from "../types/catalog.js";
 
 const PLATFORM_SEARCH_URLS: Record<string, (query: string) => string> = {
   Coursera: (q) => `https://www.coursera.org/search?query=${encodeURIComponent(q)}`,

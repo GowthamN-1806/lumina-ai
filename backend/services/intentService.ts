@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import type { Difficulty, UserIntent } from "../types/catalog.ts";
-import { expandTopics, tokenize } from "./catalogService.ts";
+import type { Difficulty, UserIntent } from "../types/catalog.js";
+import { expandTopics, tokenize } from "./catalogService.js";
 
 const INTENT_SCHEMA = {
   type: Type.OBJECT,

@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import coursesData from "../data/courses.json";
-import type { CatalogCourse, Difficulty } from "../types/catalog.ts";
+import type { CatalogCourse, Difficulty } from "../types/catalog.js";
 
 let allCourses: CatalogCourse[] = (coursesData.courses || []) as CatalogCourse[];
 let coursesById = new Map<string, CatalogCourse>(

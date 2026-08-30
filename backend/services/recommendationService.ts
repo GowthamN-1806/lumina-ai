@@ -1,9 +1,9 @@
-import type { CatalogCourse, UserIntent } from "../types/catalog.ts";
+import type { CatalogCourse, UserIntent } from "../types/catalog.js";
 import {
   getAllCatalogCourses,
   searchAndRankCatalog,
-} from "./catalogService.ts";
-import { getPlatformSearchUrl, normalizePlatformName } from "./platformFallback.ts";
+} from "./catalogService.js";
+import { getPlatformSearchUrl, normalizePlatformName } from "./platformFallback.js";
 
 export interface RecommendedCoursePayload {
   id: string;

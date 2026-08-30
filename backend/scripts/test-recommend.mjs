@@ -1,6 +1,6 @@
-import { initCatalog, getCourseById, findSimilarCourses } from "../services/catalogService.ts";
-import { extractIntentFromForm } from "../services/intentService.ts";
-import { recommendCourses, catalogCourseToFrontend } from "../services/recommendationService.ts";
+import { initCatalog, getCourseById, findSimilarCourses } from "../services/catalogService.js";
+import { extractIntentFromForm } from "../services/intentService.js";
+import { recommendCourses, catalogCourseToFrontend } from "../services/recommendationService.js";
 
 initCatalog();
 

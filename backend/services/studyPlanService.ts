@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import type { UserIntent } from "../types/catalog.ts";
+import type { UserIntent } from "../types/catalog.js";
 
 const STUDY_PLAN_SCHEMA = {
   type: Type.OBJECT,
