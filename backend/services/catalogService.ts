@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import coursesData from "../data/courses.json";
+import coursesData from "../data/courses.json" with { type: "json" };
 import type { CatalogCourse, Difficulty } from "../types/catalog.js";
 
 let allCourses: CatalogCourse[] = (coursesData.courses || []) as CatalogCourse[];
