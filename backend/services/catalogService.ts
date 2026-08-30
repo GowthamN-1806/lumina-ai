@@ -1,37 +1,42 @@
 import fs from "fs";
 import path from "path";
+import coursesData from "../data/courses.json";
 import type { CatalogCourse, Difficulty } from "../types/catalog.ts";
 
-let coursesById = new Map<string, CatalogCourse>();
-let allCourses: CatalogCourse[] = [];
+let allCourses: CatalogCourse[] = (coursesData.courses || []) as CatalogCourse[];
+let coursesById = new Map<string, CatalogCourse>(allCourses.map((c) => [c.id, c]));
 
 export function initCatalog(): void {
   try {
-    const candidatePaths = [
-      path.join(process.cwd(), "backend", "data", "courses.json"),
-      path.resolve(process.cwd(), "backend/data/courses.json"),
-      path.join(__dirname, "../data/courses.json"),
-      path.join(__dirname, "../../backend/data/courses.json"),
-    ];
+    if (allCourses.length === 0) {
+      const candidatePaths = [
+        path.join(process.cwd(), "backend", "data", "courses.json"),
+        path.resolve(process.cwd(), "backend/data/courses.json"),
+        path.join(__dirname, "../data/courses.json"),
+        path.join(__dirname, "../../backend/data/courses.json"),
+      ];
 
-    let loadedRaw: string | null = null;
-    for (const p of candidatePaths) {
-      if (fs.existsSync(p)) {
-        loadedRaw = fs.readFileSync(p, "utf-8");
-        break;
+      let loadedRaw: string | null = null;
+      for (const p of candidatePaths) {
+        if (fs.existsSync(p)) {
+          loadedRaw = fs.readFileSync(p, "utf-8");
+          break;
+        }
+      }
+
+      if (loadedRaw) {
+        const data = JSON.parse(loadedRaw) as { courses: CatalogCourse[] };
+        allCourses = data.courses || [];
+      } else {
+        allCourses = (coursesData.courses || []) as CatalogCourse[];
       }
     }
-
-    if (loadedRaw) {
-      const data = JSON.parse(loadedRaw) as { courses: CatalogCourse[] };
-      allCourses = data.courses || [];
-      coursesById = new Map(allCourses.map((c) => [c.id, c]));
-      console.log(`[Catalog] Loaded ${allCourses.length} verified courses`);
-    } else {
-      console.warn("[Catalog] Warning: courses.json not found in candidate paths. Operating with fallback catalog.");
-    }
+    coursesById = new Map(allCourses.map((c) => [c.id, c]));
+    console.log(`[Catalog] Loaded ${allCourses.length} verified courses`);
   } catch (err: any) {
     console.error("[Catalog] Error initializing catalog:", err.message || err);
+    allCourses = (coursesData.courses || []) as CatalogCourse[];
+    coursesById = new Map(allCourses.map((c) => [c.id, c]));
   }
 }
 
@@ -58,19 +63,19 @@ export function tokenize(text: string): string[] {
 const STOP_WORDS = new Set([
   "course", "courses", "learning", "tutorial", "tutorials", "for", "and", "the",
   "in", "of", "to", "a", "an", "guide", "full", "masterclass", "complete", "bootcamp",
-  "beginner", "beginners", "intermediate", "advanced"
+  "beginner", "beginners", "intermediate", "advanced", "development", "dev"
 ]);
 
 const CONCEPT_MAP = [
-  { key: "ml", synonyms: ["machine learning", "machine-learning", "ml", "machinelearning"] },
+  { key: "web", synonyms: ["web development", "web-development", "web dev", "frontend development", "front end", "back end", "backend", "full stack", "fullstack", "react", "javascript", "js", "html", "css", "web design"] },
+  { key: "ml", synonyms: ["machine learning", "machine-learning", "ml", "machinelearning", "deep learning", "neural network", "neural networks"] },
   { key: "ai", synonyms: ["artificial intelligence", "artificial-intelligence", "ai", "artificialintelligence"] },
   { key: "dl", synonyms: ["deep learning", "deep-learning", "dl", "neural network", "neural networks", "neural-network"] },
-  { key: "ds", synonyms: ["data science", "data-science", "datascience", "data analytics"] },
-  { key: "py", synonyms: ["python", "py", "python3"] },
+  { key: "ds", synonyms: ["data science", "data-science", "datascience", "data analytics", "data analysis"] },
+  { key: "py", synonyms: ["python", "py", "python3", "programming for everybody"] },
+  { key: "gamedev", synonyms: ["game development", "game dev", "gamedev", "unity", "game design", "c#"] },
   { key: "js", synonyms: ["javascript", "js", "ecmascript"] },
   { key: "ts", synonyms: ["typescript", "ts"] },
-  { key: "web", synonyms: ["web development", "web-development", "full stack", "fullstack", "frontend", "backend", "web dev"] },
-  { key: "htmlcss", synonyms: ["html", "css", "html5", "css3", "web design", "responsive web design"] },
   { key: "react", synonyms: ["react", "reactjs", "react.js"] },
   { key: "node", synonyms: ["node", "nodejs", "node.js", "express"] },
   { key: "sql", synonyms: ["sql", "mysql", "postgresql", "postgres", "database", "dbms", "rdbms"] },
@@ -186,6 +191,10 @@ export function searchAndRankCatalog(query: string, platformFilter = "Any"): Cat
       const cpNorm = normText(c.platform);
       return cpNorm.includes(pNorm) || pNorm.includes(cpNorm);
     });
+
+    if (subset.length === 0) {
+      subset = allCourses;
+    }
   }
 
   const scored = subset.map((c) => {
@@ -232,8 +241,7 @@ export function searchAndRankCatalog(query: string, platformFilter = "Any"): Cat
       }
     }
 
-    // Base fallback score for platform subset if rawTokens & concepts are empty
-    if (score === 0 && rawTokens.length === 0 && matchedConcepts.size === 0) {
+    if (score === 0 && (rawTokens.length === 0 || matchedConcepts.size > 0)) {
       score = 5;
     }
 
