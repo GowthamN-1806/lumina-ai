@@ -5,14 +5,34 @@ import type { CatalogCourse, Difficulty } from "../types/catalog.ts";
 let coursesById = new Map<string, CatalogCourse>();
 let allCourses: CatalogCourse[] = [];
 
-const CATALOG_PATH = path.join(process.cwd(), "backend", "data", "courses.json");
-
 export function initCatalog(): void {
-  const raw = fs.readFileSync(CATALOG_PATH, "utf-8");
-  const data = JSON.parse(raw) as { courses: CatalogCourse[] };
-  allCourses = data.courses;
-  coursesById = new Map(allCourses.map((c) => [c.id, c]));
-  console.log(`[Catalog] Loaded ${allCourses.length} verified courses`);
+  try {
+    const candidatePaths = [
+      path.join(process.cwd(), "backend", "data", "courses.json"),
+      path.resolve(process.cwd(), "backend/data/courses.json"),
+      path.join(__dirname, "../data/courses.json"),
+      path.join(__dirname, "../../backend/data/courses.json"),
+    ];
+
+    let loadedRaw: string | null = null;
+    for (const p of candidatePaths) {
+      if (fs.existsSync(p)) {
+        loadedRaw = fs.readFileSync(p, "utf-8");
+        break;
+      }
+    }
+
+    if (loadedRaw) {
+      const data = JSON.parse(loadedRaw) as { courses: CatalogCourse[] };
+      allCourses = data.courses || [];
+      coursesById = new Map(allCourses.map((c) => [c.id, c]));
+      console.log(`[Catalog] Loaded ${allCourses.length} verified courses`);
+    } else {
+      console.warn("[Catalog] Warning: courses.json not found in candidate paths. Operating with fallback catalog.");
+    }
+  } catch (err: any) {
+    console.error("[Catalog] Error initializing catalog:", err.message || err);
+  }
 }
 
 export function getCatalogSize(): number {
