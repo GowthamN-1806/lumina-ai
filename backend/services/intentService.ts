@@ -25,7 +25,7 @@ const INTENT_SCHEMA = {
   ],
 };
 
-const MODELS_TO_TRY = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+const MODELS_TO_TRY = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash-latest"];
 
 function normalizeDifficulty(value: string): Difficulty {
   const v = value.toLowerCase();

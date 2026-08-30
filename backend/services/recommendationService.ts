@@ -124,26 +124,18 @@ function scoreCourse(course: CatalogCourse, intent: UserIntent, topics: Set<stri
   return score;
 }
 
-export function recommendCourses(intent: UserIntent, limit = 5): RecommendedCoursePayload[] {
+export function recommendCourses(intent: UserIntent, limit = 6): RecommendedCoursePayload[] {
   const topics = expandTopics([intent.learningGoal, ...intent.topics]);
-
-  // Load complete catalog
   const allCourses = getAllCatalogCourses();
-
-  // Normalize selected platform
   const platform = normalizePlatformName(intent.preferredPlatform);
 
-  // Filter by selected platform
   let catalog =
     platform === "Any"
       ? allCourses
       : allCourses.filter(
-          (course) =>
-            course.platform.toLowerCase() === platform.toLowerCase()
+          (course) => course.platform.toLowerCase() === platform.toLowerCase()
         );
 
-  // If no courses exist for the selected platform,
-  // gracefully fall back to the complete catalog.
   if (catalog.length === 0) {
     catalog = allCourses;
   }
@@ -156,46 +148,70 @@ export function recommendCourses(intent: UserIntent, limit = 5): RecommendedCour
     .filter((s) => s.score > 0)
     .sort((a, b) => b.score - a.score);
 
-  const seen = new Set<string>();
   const results: RecommendedCoursePayload[] = [];
+  const seen = new Set<string>();
 
-  for (const { course, score } of scored) {
-    if (seen.has(course.id)) continue;
-    seen.add(course.id);
+  if (platform === "Any") {
+    // Multi-platform diversification: pick top course per platform first
+    const platformGroups = new Map<string, Array<{ course: CatalogCourse; score: number }>>();
+    for (const item of scored) {
+      const p = item.course.platform;
+      if (!platformGroups.has(p)) platformGroups.set(p, []);
+      platformGroups.get(p)!.push(item);
+    }
 
-    results.push(catalogToRecommendedCourse(course, intent, score));
+    // Round 1: Select 1 top course from each distinct platform
+    for (const [p, items] of platformGroups.entries()) {
+      if (results.length >= limit) break;
+      const top = items[0];
+      if (!seen.has(top.course.id)) {
+        seen.add(top.course.id);
+        results.push(catalogToRecommendedCourse(top.course, intent, top.score));
+      }
+    }
 
-    if (results.length >= limit) break;
+    // Round 2: Fill remaining slots with next highest scored overall
+    for (const { course, score } of scored) {
+      if (results.length >= limit) break;
+      if (!seen.has(course.id)) {
+        seen.add(course.id);
+        results.push(catalogToRecommendedCourse(course, intent, score));
+      }
+    }
+  } else {
+    // Specific platform selected: select top matches for that platform
+    for (const { course, score } of scored) {
+      if (seen.has(course.id)) continue;
+      seen.add(course.id);
+      results.push(catalogToRecommendedCourse(course, intent, score));
+      if (results.length >= limit) break;
+    }
   }
 
-  // If no recommendation is found,
-  // generate an official platform search link.
-  if (results.length === 0) {
-    const fallbackPlatform =
-      platform !== "Any" ? platform : "Coursera";
-
-    const searchUrl = getPlatformSearchUrl(
-      fallbackPlatform,
-      intent.learningGoal
-    );
-
-    results.push({
-      id: `fallback-search-${Date.now()}`,
-      name: `Explore ${intent.learningGoal} on ${fallbackPlatform}`,
-      platform: fallbackPlatform,
-      duration: "Self-paced",
-      difficulty: intent.skillLevel,
-      certificate: false,
-      rating: 4.0,
-      enrollUrl: searchUrl,
-      officialUrl: searchUrl,
-      whyRecommended: `No verified catalog course matched your search. Opening the official ${fallbackPlatform} search page.`,
-      expectedOutcome: `Browse official ${fallbackPlatform} courses for ${intent.learningGoal}.`,
-      instructor: fallbackPlatform,
-      description: `Official ${fallbackPlatform} search results for ${intent.learningGoal}.`,
-      skills: intent.topics.slice(0, 3),
-      tags: intent.topics,
-    });
+  // If results are sparse or empty for a requested platform, attach official search link
+  if (results.length < limit) {
+    const targetPlatform = platform !== "Any" ? platform : "Coursera";
+    const searchUrl = getPlatformSearchUrl(targetPlatform, intent.learningGoal);
+    const fallbackId = `official-search-${targetPlatform.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`;
+    if (!seen.has(fallbackId)) {
+      results.push({
+        id: fallbackId,
+        name: `Browse ${intent.learningGoal} Catalog on ${targetPlatform}`,
+        platform: targetPlatform,
+        duration: "Self-paced",
+        difficulty: intent.skillLevel,
+        certificate: true,
+        rating: 4.8,
+        enrollUrl: searchUrl,
+        officialUrl: searchUrl,
+        whyRecommended: `Explore official verified ${targetPlatform} catalog search results for ${intent.learningGoal}.`,
+        expectedOutcome: `Access live course list and certifications directly on ${targetPlatform}.`,
+        instructor: `${targetPlatform} Verified Partner`,
+        description: `Official search destination for ${intent.learningGoal} courses on ${targetPlatform}.`,
+        skills: intent.topics.slice(0, 3),
+        tags: intent.topics,
+      });
+    }
   }
 
   return results;

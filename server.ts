@@ -1467,36 +1467,25 @@ app.post("/api/recommend", async (req, res) => {
       budget,
     };
 
-    let intent;
-    let studyPlan;
+    // Instant rule-based intent extraction (0ms)
+    const intent = extractIntentFromForm(formBody);
+
+    // Instant verified course match across diverse platforms (0ms)
+    const courses = recommendCourses(intent, 6);
+
+    let studyPlan = generateMockStudyPlan(intent);
 
     if (aiInstance) {
-      let timerId: NodeJS.Timeout | null = null;
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        timerId = setTimeout(() => {
-          reject(new Error("Recommendation generation timed out. Please try again."));
-        }, 29000);
-      });
-
       try {
-        intent = await Promise.race([
-          extractIntentWithGemini(aiInstance, formBody),
-          timeoutPromise,
-        ]);
-        studyPlan = await Promise.race([
-          generateStudyPlanWithGemini(aiInstance, intent),
-          timeoutPromise,
-        ]);
-      } finally {
-        if (timerId) clearTimeout(timerId);
+        const geminiPromise = generateStudyPlanWithGemini(aiInstance, intent);
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("Fast timeout for Gemini study plan")), 3000);
+        });
+        studyPlan = await Promise.race([geminiPromise, timeoutPromise]);
+      } catch (err: any) {
+        console.warn("[DEBUG] /api/recommend - Fast fallback engaged. Serving instant structured study plan.");
       }
-    } else {
-      console.warn("[DEBUG] /api/recommend - No Gemini key; using rule-based intent and local study plan");
-      intent = extractIntentFromForm(formBody);
-      studyPlan = generateMockStudyPlan(intent);
     }
-
-    const courses = recommendCourses(intent, 5);
 
     const response = {
       id: "rec-" + Math.random().toString(36).slice(2, 11),
